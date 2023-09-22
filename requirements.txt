@@ -1,1 +1,2 @@
-pandas==1.3.3 
+pandas==1.3.3  # due to the csv method
+openpyxl==3.0.7  # needed to export excel
