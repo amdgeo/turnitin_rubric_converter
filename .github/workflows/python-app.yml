@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['windows-latest', 'ubuntu-latest']  # Fixed missing quote
+        os: ['windows-latest', 'ubuntu-latest','macos-latest']  # Fixed missing quote
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-python@v2
@@ -51,11 +51,11 @@ jobs:
         release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }} # From the step above
-        asset_path: ./dist/artifact.zip  # TODO: Change this to your artifact path
-        token:  ${{ secrets.RELEASE_TOKEN }}
-        asset_name: your-artifact.zip  # TODO: Change this to your artifact name
-        asset_content_type: application/zip  # TODO: Change this to your artifact content type
+    # - name: Upload Release Asset
+    #   uses: actions/upload-release-asset@v1
+    #   with:
+    #     upload_url: ${{ steps.create_release.outputs.upload_url }} # From the step above
+    #     asset_path: ./dist/artifact.zip  # TODO: Change this to your artifact path
+    #     token:  ${{ secrets.RELEASE_TOKEN }}
+    #     asset_name: your-artifact.zip  # TODO: Change this to your artifact name
+    #     asset_content_type: application/zip  # TODO: Change this to your artifact content type
