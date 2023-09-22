@@ -6,6 +6,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
 
+
 def convert_rubric_to_csv_or_excel(input_json_path, output_path, output_format):
     with open(input_json_path, 'r') as file:
         rubric_data = json.load(file)
@@ -18,9 +19,10 @@ def convert_rubric_to_csv_or_excel(input_json_path, output_path, output_format):
     rubric_criterion_section = rubric_data['RubricCriterion']
     rows = []
     for criterion in rubric_criterion_section:
-        #row = [criterion['description']]
-        row = [criterion['name']] + [criterion['value']]
-        
+        if use_name_and_value.get():
+            row = [f"{criterion['name']} ({criterion['value']})"]
+        else:
+            row = [criterion['description']]
         #row = [criterion['description']]
         row.extend([''] * (len(column_headers) - 1))
         rows.append(row)
@@ -69,6 +71,7 @@ def run_conversion():
 # Create the main window
 root = tk.Tk()
 root.title("Rubric Converter")
+use_name_and_value = tk.BooleanVar()
 
 # Create and place the elements
 tk.Label(root, text="Select Input .rbc File:").pack(pady=10)
@@ -86,6 +89,9 @@ output_format_var = tk.StringVar()
 output_format_var.set("CSV")
 output_format_menu = ttk.Combobox(root, textvariable=output_format_var, values=("CSV", "Excel"))
 output_format_menu.pack(pady=5)
+
+tk.Checkbutton(root, text="Use name + value instead of description for Criteria ", variable=use_name_and_value).pack(pady=10)
+
 
 tk.Button(root, text="Convert", command=run_conversion).pack(pady=20)
 
