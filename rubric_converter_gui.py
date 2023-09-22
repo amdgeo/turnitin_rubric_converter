@@ -21,7 +21,7 @@ def convert_rubric_to_csv_or_excel(input_json_path, output_path, output_format):
         #row = [criterion['description']]
         row = [criterion['name']] + [criterion['value']]
         
-        row = [criterion['description']]
+        #row = [criterion['description']]
         row.extend([''] * (len(column_headers) - 1))
         rows.append(row)
         
