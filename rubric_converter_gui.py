@@ -18,6 +18,9 @@ def convert_rubric_to_csv_or_excel(input_json_path, output_path, output_format):
     rubric_criterion_section = rubric_data['RubricCriterion']
     rows = []
     for criterion in rubric_criterion_section:
+        #row = [criterion['description']]
+        row = [criterion['name']] + [criterion['value']]
+        
         row = [criterion['description']]
         row.extend([''] * (len(column_headers) - 1))
         rows.append(row)
