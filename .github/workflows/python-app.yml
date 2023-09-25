@@ -1,0 +1,61 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python application
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['windows-latest', 'ubuntu-latest','macos-latest']  # Fixed missing quote
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pyinstaller  # Separate command to install PyInstaller
+
+    - name: Create standalone executable
+      run: pyinstaller --onefile rubric_converter_gui.py 
+
+    # Optionally verify that it works (provided that it does not need user interaction)
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        path: dist/*
+
+  release:
+    needs: build  # This job needs to wait for the previous "build" job to complete
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Download Artifact
+      uses: actions/download-artifact@v2
+      with:
+        path: dist/
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    # - name: Upload Release Asset
+    #   uses: actions/upload-release-asset@v1
+    #   with:
+    #     upload_url: ${{ steps.create_release.outputs.upload_url }} # From the step above
+    #     asset_path: ./dist/artifact.zip  # TODO: Change this to your artifact path
+    #     token:  ${{ secrets.RELEASE_TOKEN }}
+    #     asset_name: your-artifact.zip  # TODO: Change this to your artifact name
+    #     asset_content_type: application/zip  # TODO: Change this to your artifact content type
