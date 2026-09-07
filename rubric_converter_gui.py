@@ -1,99 +1,119 @@
-import json
-import csv
-import pandas as pd
+"""Tkinter interface for converting Turnitin rubric files."""
+
+from __future__ import annotations
+
 import tkinter as tk
-from tkinter import filedialog
-from tkinter import messagebox
-from tkinter import ttk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+
+from rubric_converter import RubricConversionError, build_table, convert_rubric, load_rubric
 
 
-def convert_rubric_to_csv_or_excel(input_json_path, output_path, output_format):
-    with open(input_json_path, 'r') as file:
-        rubric_data = json.load(file)
-    
-    rubric_scale_section = rubric_data['RubricScale']
-    column_headers = ['Criteria']
-    for scale in rubric_scale_section:
-        column_headers.append(scale['name'])
-    
-    rubric_criterion_section = rubric_data['RubricCriterion']
-    rows = []
-    for criterion in rubric_criterion_section:
-        if use_name_and_value.get():
-            row = [f"{criterion['name']} ({criterion['value']})"]
-        else:
-            row = [criterion['description']]
-        #row = [criterion['description']]
-        row.extend([''] * (len(column_headers) - 1))
-        rows.append(row)
-        
-    rubric_criterion_scale_section = rubric_data['RubricCriterionScale']
-    criterion_id_to_row_index = {criterion['id']: index for index, criterion in enumerate(rubric_criterion_section)}
-    scale_value_id_to_column_index = {scale['id']: index + 1 for index, scale in enumerate(rubric_scale_section)}
-    
-    for entry in rubric_criterion_scale_section:
-        row_index = criterion_id_to_row_index[entry['criterion']]
-        column_index = scale_value_id_to_column_index[entry['scale_value']]
-        rows[row_index][column_index] = entry['description']
-    
-    if output_format == 'CSV':
-        with open(output_path, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(column_headers)
-            writer.writerows(rows)
-    elif output_format == 'Excel':
-        df = pd.DataFrame(rows, columns=column_headers)
-        df.to_excel(output_path, index=False)
-    
-    print("File has been successfully saved at:", output_path)
+class RubricConverterApp:
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+        self.root.title("Turnitin Rubric Converter")
+        self.root.minsize(700, 500)
+        self.input_path = tk.StringVar()
+        self.output_path = tk.StringVar()
+        self.output_format = tk.StringVar(value="CSV")
+        self.use_name_and_value = tk.BooleanVar()
+        self.status = tk.StringVar(value="Select an .rbc file to begin.")
+        self._build_ui()
 
-def select_input_file():
-    file_path = filedialog.askopenfilename(filetypes=[("Rubric Files", "*.rbc"), ("All Files", "*.*")])
-    input_file_entry.delete(0, tk.END)
-    input_file_entry.insert(0, file_path)
+    def _build_ui(self) -> None:
+        frame = ttk.Frame(self.root, padding=16)
+        frame.pack(fill=tk.BOTH, expand=True)
+        frame.columnconfigure(1, weight=1)
+        ttk.Label(frame, text="Input .rbc file:").grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Entry(frame, textvariable=self.input_path).grid(row=0, column=1, sticky="ew", pady=5)
+        ttk.Button(frame, text="Browse...", command=self.select_input).grid(row=0, column=2, padx=(8, 0))
+        ttk.Label(frame, text="Output file:").grid(row=1, column=0, sticky="w", pady=5)
+        ttk.Entry(frame, textvariable=self.output_path).grid(row=1, column=1, sticky="ew", pady=5)
+        ttk.Button(frame, text="Browse...", command=self.select_output).grid(row=1, column=2, padx=(8, 0))
+        ttk.Label(frame, text="Format:").grid(row=2, column=0, sticky="w", pady=5)
+        format_box = ttk.Combobox(
+            frame, textvariable=self.output_format, values=("CSV", "Excel"), state="readonly", width=12
+        )
+        format_box.grid(row=2, column=1, sticky="w", pady=5)
+        format_box.bind("<<ComboboxSelected>>", lambda _event: self._update_extension())
+        ttk.Checkbutton(
+            frame, text="Use criterion name and value in the Criteria column",
+            variable=self.use_name_and_value, command=self.preview,
+        ).grid(row=3, column=0, columnspan=3, sticky="w", pady=5)
+        buttons = ttk.Frame(frame)
+        buttons.grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 12))
+        ttk.Button(buttons, text="Preview", command=self.preview).pack(side=tk.LEFT)
+        ttk.Button(buttons, text="Convert", command=self.convert).pack(side=tk.LEFT, padx=8)
+        ttk.Label(frame, textvariable=self.status).grid(row=5, column=0, columnspan=3, sticky="w")
+        self.preview_tree = ttk.Treeview(frame, show="headings", height=12)
+        self.preview_tree.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
+        frame.rowconfigure(6, weight=1)
 
-def select_output_file():
-    output_format = output_format_var.get()
-    if output_format == 'CSV':
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")])
-    elif output_format == 'Excel':
-        file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel Files", "*.xlsx"), ("All Files", "*.*")])
-    output_file_entry.delete(0, tk.END)
-    output_file_entry.insert(0, file_path)
+    def select_input(self) -> None:
+        selected = filedialog.askopenfilename(
+            title="Select Turnitin rubric", filetypes=[("Rubric files", "*.rbc"), ("All files", "*.*")]
+        )
+        if selected:
+            self.input_path.set(selected)
+            if not self.output_path.get():
+                self.output_path.set(str(Path(selected).with_suffix(".csv")))
+            self.preview()
 
-def run_conversion():
-    input_file_path = input_file_entry.get()
-    output_file_path = output_file_entry.get()
-    output_format = output_format_var.get()
-    convert_rubric_to_csv_or_excel(input_file_path, output_file_path, output_format)
-    messagebox.showinfo("Success", "File has been successfully saved at:\n" + output_file_path)
+    def select_output(self) -> None:
+        extension = ".xlsx" if self.output_format.get() == "Excel" else ".csv"
+        selected = filedialog.asksaveasfilename(
+            title="Save converted rubric", defaultextension=extension,
+            filetypes=[("Excel files", "*.xlsx"), ("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if selected:
+            self.output_path.set(selected)
 
-# Create the main window
-root = tk.Tk()
-root.title("Rubric Converter")
-use_name_and_value = tk.BooleanVar()
+    def _update_extension(self) -> None:
+        path = self.output_path.get()
+        if path:
+            self.output_path.set(str(Path(path).with_suffix(".xlsx" if self.output_format.get() == "Excel" else ".csv")))
 
-# Create and place the elements
-tk.Label(root, text="Select Input .rbc File:").pack(pady=10)
-input_file_entry = tk.Entry(root, width=50)
-input_file_entry.pack(pady=5)
-tk.Button(root, text="Browse", command=select_input_file).pack(pady=5)
+    def preview(self) -> None:
+        try:
+            table = build_table(load_rubric(self.input_path.get()), self.use_name_and_value.get())
+        except RubricConversionError as exc:
+            self.status.set(str(exc))
+            return
+        self.preview_tree.delete(*self.preview_tree.get_children())
+        self.preview_tree["columns"] = table.headers
+        for header in table.headers:
+            self.preview_tree.heading(header, text=header)
+            self.preview_tree.column(header, width=160, anchor="w")
+        for row in table.rows[:100]:
+            self.preview_tree.insert("", tk.END, values=row)
+        self.status.set(f"Previewing {len(table.rows)} criteria.")
 
-tk.Label(root, text="Select Output File:").pack(pady=10)
-output_file_entry = tk.Entry(root, width=50)
-output_file_entry.pack(pady=5)
-tk.Button(root, text="Browse", command=select_output_file).pack(pady=5)
+    def convert(self) -> None:
+        if not self.input_path.get() or not self.output_path.get():
+            messagebox.showerror("Missing file", "Select both an input rubric and an output file.")
+            return
+        output = Path(self.output_path.get())
+        expected = ".xlsx" if self.output_format.get() == "Excel" else ".csv"
+        if output.suffix.lower() != expected:
+            output = output.with_suffix(expected)
+            self.output_path.set(str(output))
+        if output.exists() and not messagebox.askyesno("Overwrite file?", f"{output} already exists. Replace it?"):
+            return
+        try:
+            convert_rubric(self.input_path.get(), output, self.output_format.get(), self.use_name_and_value.get())
+        except RubricConversionError as exc:
+            messagebox.showerror("Conversion failed", str(exc))
+            return
+        self.status.set(f"Saved {output}")
+        messagebox.showinfo("Conversion complete", f"File saved to:\n{output}")
 
-tk.Label(root, text="Select Output Format:").pack(pady=10)
-output_format_var = tk.StringVar()
-output_format_var.set("CSV")
-output_format_menu = ttk.Combobox(root, textvariable=output_format_var, values=("CSV", "Excel"))
-output_format_menu.pack(pady=5)
 
-tk.Checkbutton(root, text="Use name + value instead of description for Criteria ", variable=use_name_and_value).pack(pady=10)
+def main() -> None:
+    root = tk.Tk()
+    RubricConverterApp(root)
+    root.mainloop()
 
 
-tk.Button(root, text="Convert", command=run_conversion).pack(pady=20)
-
-# Run the main loop
-root.mainloop()
+if __name__ == "__main__":
+    main()
