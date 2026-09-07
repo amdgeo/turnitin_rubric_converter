@@ -1,10 +1,68 @@
-# TurnItIn Rubric Converter
+# Turnitin Rubric Converter
 
-I suspect many educators have been frustrated by the fact that rubrics created in TurnItIn can only be directly exported in .rbc format, which can't be directly used in anything else. In order to add these to my Moodle pages in a visual format, I've created a tool for converting TurnItIn rubrics in excel or csv format for inclusion in teaching materials and suchlike.
+Turnitin rubric files use the `.rbc` extension and contain JSON data that is not
+convenient to edit or reuse. This project converts those files to a readable
+CSV matrix or a structured Excel workbook.
 
-The tool is based on a python script, but all you need to do to use it is download the rubric_converter_gui.exe file from the <a href="https://github.com/amdgeo/turnitin_rubric_converter/releases/tag/v2023.0">release page</a>. This will open up the interface shown below - simply browse to select your rubric file downoaded from TurnItIn, select whether you'd like your output in csv or excel format, and then click the second browse button to set a save location and file name for the converted rubric. Simple!
+## Features
 
-If this saves you time and you're feeling generous, buy me a coffee at https://ko-fi.com/amdgs
+- CSV export with UTF-8 encoding and spreadsheet formula-injection protection.
+- Excel export with `Criteria Matrix`, `Criteria Details`, `Scale Values`, and
+  optional `Metadata` worksheets.
+- Validation of required sections, IDs, and criterion/scale references.
+- Preview and overwrite confirmation in the desktop application.
+- Command-line conversion for scripts and automation.
+- Cross-platform GitHub Actions tests and tagged-release packaging.
 
-![image](https://github.com/amdgeo/turnitin_rubric_converter/assets/47116351/ea39b0d4-c00a-4676-97d2-3b434879159e)
+## Desktop application
 
+Install Python 3.9 or later, then run:
+
+```bash
+python -m pip install -r requirements.txt
+python rubric_converter_gui.py
+```
+
+Select an `.rbc` file, choose CSV or Excel, select an output path, and click
+**Preview** or **Convert**. The executable releases are available on the
+[Releases page](https://github.com/amdgeo/turnitin_rubric_converter/releases).
+
+### Windows installation
+
+For the easiest setup on Windows, download
+`Turnitin-Rubric-Converter-Setup.exe` from the latest release and run it. The
+installer adds the app to the Start menu, can optionally add a desktop
+shortcut, and includes an uninstaller. The portable `rubric-converter.exe`
+download remains available for users who prefer not to install the app.
+
+## Command line
+
+```bash
+python rubric_converter_cli.py input.rbc output.csv
+python rubric_converter_cli.py input.rbc output.xlsx --format excel
+python rubric_converter_cli.py input.rbc output.csv --use-name-and-value
+python rubric_converter_cli.py ./rubrics ./converted --batch --format excel
+```
+
+The output format is inferred from `.csv` or `.xlsx` when `--format` is not
+provided. Batch mode converts every `.rbc` file in a directory. Invalid files
+produce a clear error and a non-zero exit status.
+
+## Development
+
+Run the test suite with:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pytest
+```
+
+To create a standalone desktop executable locally:
+
+```bash
+python -m pip install pyinstaller
+pyinstaller --onefile --name rubric-converter rubric_converter_gui.py
+```
+
+Tagged pushes such as `v2026.1` run the cross-platform build and attach the
+three executables and the Windows installer to a GitHub release.

@@ -1,61 +1,75 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: Python application
 
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: ['windows-latest', 'ubuntu-latest','macos-latest']  # Fixed missing quote
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
-      with:
-        python-version: 3.7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run tests
+        run: python -m pytest
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install pyinstaller  # Separate command to install PyInstaller
-
-    - name: Create standalone executable
-      run: pyinstaller --onefile rubric_converter_gui.py 
-
-    # Optionally verify that it works (provided that it does not need user interaction)
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        path: dist/*
+  package:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            executable: rubric-converter.exe
+          - os: ubuntu-latest
+            name: linux
+            executable: rubric-converter
+          - os: macos-latest
+            name: macos
+            executable: rubric-converter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build executable
+        shell: bash
+        run: |
+          python -m pip install -r requirements.txt pyinstaller
+          pyinstaller --onefile --name "${{ matrix.executable }}" rubric_converter_gui.py
+      - name: Build Windows installer
+        if: matrix.name == 'windows'
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
+        with:
+          path: installer/rubric-converter.iss
+          options: /DMyAppVersion=${{ github.ref_name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rubric-converter-${{ matrix.name }}
+          path: dist/*
 
   release:
-    needs: build  # This job needs to wait for the previous "build" job to complete
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-    - name: Download Artifact
-      uses: actions/download-artifact@v2
-      with:
-        path: dist/
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-    # - name: Upload Release Asset
-    #   uses: actions/upload-release-asset@v1
-    #   with:
-    #     upload_url: ${{ steps.create_release.outputs.upload_url }} # From the step above
-    #     asset_path: ./dist/artifact.zip  # TODO: Change this to your artifact path
-    #     token:  ${{ secrets.RELEASE_TOKEN }}
-    #     asset_name: your-artifact.zip  # TODO: Change this to your artifact name
-    #     asset_content_type: application/zip  # TODO: Change this to your artifact content type
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
